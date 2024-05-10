@@ -1,57 +1,57 @@
 import numpy as np
-import librosa
-from sklearn.mixture import GaussianMixture
-import matplotlib
-matplotlib.use('Agg')
+import librosa                                    # 오디오 분석 라이브러리
+from sklearn.mixture import GaussianMixture       # 가우시안 혼합모델(머신러닝에서 사용)
+import matplotlib                                 # 그래프를 그리기 위함
+matplotlib.use('Agg')                             
 import matplotlib.pyplot as plt
-import pickle
-import argparse
-import os
+import pickle                                     # 파이썬 객체 직렬화/역직렬화 (?)
+import argparse                                   # 명령줄 인수를 파싱(?)
+import os                                         # 파일 및 디렉토리 조작
 import pandas as pd
 
 
-def load_wavs_as_matrices(data_dir):
-    filenames = os.listdir(data_dir)
-    out = []
-    for filename in filenames:
-        filepath = os.path.join(data_dir,filename)
-        y, sr = librosa.load(filepath)
-        mfccs=librosa.feature.mfcc(y,sr)
-        out.append(mfccs.T)
+def load_wavs_as_matrices(data_dir):                  # 지정한 디렉토리의 오디오 파일을 읽어 MFCC(각 파일의 델 주파수 켑스트럼 계수) 추출  ->  쉽게 설명 : 소리를 컴퓨터가 이해하기 쉽게 변환
+    filenames = os.listdir(data_dir)                  # 파일지정
+    out = []                                          # 아웃풋 리스트 선언
+    for filename in filenames:                        # 파일을 모두 순회하며
+        filepath = os.path.join(data_dir,filename)    # 각 파일이름(filename)을 data_dir 경로와 결합하여 전체경로 filepath를 생성
+        y, sr = librosa.load(filepath)                # librosa 라이브러리의 load 함수를 사용하여 오디오 파일을 읽음. y->오디오 신호 데이터 , sr->초당 샘플 수
+        mfccs=librosa.feature.mfcc(y,sr)              # librosa의 mfcc 함수를 사용해 MFCC 특징 추출.
+        out.append(mfccs.T)                           # 아웃풋 리스트에 MFCC 특징을 추가 (전치행렬 쓰는 이유?)
     return out
 
 
-def load_datasets():
+def load_datasets():                                                  # 학습 데이터 & 테스트 데이터 불러오는 함수
     # load training data and test data 
-    train_data_dirs = {
+    train_data_dirs = {                                               # 학습 데이터의 경로 (verif-대상 검증, ubg-백그라운드 검증)
         'Verif_disjoint':'./data/target/train_verification/',
         'ubg'           :'./data/ubg/train_verification/'
     }
 
-    train_data = {}
-    for name, data_dir in train_data_dirs.items():
-        train_data[name] = load_wavs_as_matrices(data_dir)
+    train_data = {}                                                   # 학습 데이터 저장할 딕셔너리
+    for name, data_dir in train_data_dirs.items():                    # 파일을 순회하며 name(key), data_dir(value)값을 가져옴.
+        train_data[name] = load_wavs_as_matrices(data_dir)            # data_dir에서 데이터를 로드하고 train_data 딕셔너리에 추가
     
-    test_data_dirs = {
-        'train_Conv' :'./data/target/train_conversion/',
-        'test'       :'./data/target/test/',
-        'ubg_test'   :'./data/ubg/test/',
-        'fake'       :'./data/fake'
+    test_data_dirs = {                                                # 테스트 데이터 경로
+        'train_Conv' :'./data/target/train_conversion/',              # 변환용 학습 데이터
+        'test'       :'./data/target/test/',                          # 대상 테스트 데이터
+        'ubg_test'   :'./data/ubg/test/',                             # 백그라운드 테스트 데이터
+        'fake'       :'./data/fake'                                   # 페이크 데이
     }
 
-    test_data = {}
-    for name, data_dir in test_data_dirs.items():
+    test_data = {}                                                    # 테스트 데이터 저장할 딕셔너리
+    for name, data_dir in test_data_dirs.items():                     
         test_data[name] =load_wavs_as_matrices(data_dir)
         
-    # make shared data
-    test_data['validation_Verif'] = train_data['Verif_disjoint'][-20:]
-    train_data['Verif_disjoint']  = train_data['Verif_disjoint'][:-20]
-    train_data['Verif_shared'] = train_data['Verif_disjoint']+test_data['train_Conv'][-20:]
-    test_data['train_Conv'] = test_data['train_Conv'][-20:]
-    return train_data,test_data
+    # make shared data                                                        # 공유 데이터를 생성할거임
+    test_data['validation_Verif'] = train_data['Verif_disjoint'][-20:]        # 마지막 20개의 항목 test_data에
+    train_data['Verif_disjoint']  = train_data['Verif_disjoint'][:-20]        # 마지막 20개 제외하고 전부 train_data에
+    train_data['Verif_shared'] = train_data['Verif_disjoint']+test_data['train_Conv'][-20:] # 다른 train_data에는 결합해서 저장
+    test_data['train_Conv'] = test_data['train_Conv'][-20:]                   # 또다른 test_data 파일.. 
+    return train_data,test_data                                               # 일단은 뭐 훈련에 많이, 테스트에 적게 라는건 알겠다.
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':        # 데이터 로드하는 거고 모델 쪽으로 중요한 건 없으니까 상세분석은 미뤄도 될 거 같다다
     
     # get model directory
     parser = argparse.ArgumentParser(description = 'Train GMM models for verification and plot the scores for data.')
